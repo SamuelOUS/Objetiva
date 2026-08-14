@@ -11,3 +11,41 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum EstadoObjetivo {
+  PENDIENTE
+  EN_PROGRESO
+  COMPLETADO
+}
+
+model Categoria {
+  id          Int        @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  objetivos   Objetivo[]
+}
+
+model Objetivo {
+  id          Int             @id @default(autoincrement())
+  titulo      String
+  descripcion String?
+  fechaInicio DateTime
+  fechaFin    DateTime?
+  estado      EstadoObjetivo  @default(PENDIENTE)
+
+  categoriaId Int
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
+  tareas      Tarea[]
+}
+
+model Tarea {
+  id          Int       @id @default(autoincrement())
+  titulo      String
+  descripcion String?
+  completada  Boolean   @default(false)
+  fechaLimite DateTime?
+
+  objetivoId  Int
+  objetivo    Objetivo @relation(fields: [objetivoId], references: [id])
+}
