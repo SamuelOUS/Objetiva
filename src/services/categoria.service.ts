@@ -55,3 +55,13 @@ export async function actualizarCategoria(
     data,
   });
 }
+
+/*------------------------------------------------------------------------------------- */
+
+export async function eliminarCategoria(id: number) {
+  return prisma.categoria.delete({
+    where: {
+      id,
+    },
+  });
+}
