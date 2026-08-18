@@ -6,7 +6,8 @@ import {
     obtenerTareas,
     obtenerTareaPorId,
     actualizarTarea,
-    eliminarTarea
+    eliminarTarea,
+    consultarTareasQuery
 
 
  } 
@@ -275,6 +276,48 @@ export async function eliminarTareaController(
         error: "Tarea no encontrada",
       });
     }
+
+    return res.status(500).json({
+      error: "Error interno del servidor",
+    });
+  }
+}
+
+/*------------------------------------------------------------------------------------- */
+
+export async function consultarTareasQueryController(
+  req: Request,
+  res: Response
+) {
+  const { completada, objetivoId } = req.body;
+
+  if (
+    completada !== undefined &&
+    typeof completada !== "boolean"
+  ) {
+    return res.status(400).json({
+      error: "Completada debe ser un booleano",
+    });
+  }
+
+  if (
+    objetivoId !== undefined &&
+    (!Number.isInteger(objetivoId) || objetivoId <= 0)
+  ) {
+    return res.status(400).json({
+      error: "El objetivoId debe ser un entero positivo",
+    });
+  }
+
+  try {
+    const tareas = await consultarTareasQuery({
+      completada,
+      objetivoId,
+    });
+
+    return res.status(200).json(tareas);
+  } catch (error) {
+    console.error(error);
 
     return res.status(500).json({
       error: "Error interno del servidor",

@@ -16,6 +16,10 @@ interface ActualizarTareaData {
   objetivoId: number;
 }
 
+interface ConsultarTareasDataQuery {
+  completada?: boolean;
+  objetivoId?: number;
+}
 
 export async function crearTarea(data: CrearTareaData) {
   return prisma.tarea.create({
@@ -82,6 +86,28 @@ export async function eliminarTarea(id: number) {
   return prisma.tarea.delete({
     where: {
       id,
+    },
+  });
+}
+
+/*------------------------------------------------------------------------------------- */
+
+export async function consultarTareasQuery(data: ConsultarTareasDataQuery) {
+  return prisma.tarea.findMany({
+    where: {
+      ...(data.completada !== undefined && {
+        completada: data.completada,
+      }),
+
+      ...(data.objetivoId !== undefined && {
+        objetivoId: data.objetivoId,
+      }),
+    },
+    include: {
+      objetivo: true,
+    },
+    orderBy: {
+      id: "asc",
     },
   });
 }
