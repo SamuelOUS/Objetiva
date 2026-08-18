@@ -7,7 +7,8 @@ import {
     crearObjetivo,
     obtenerObjetivos,
     obtenerObjetivosPorId,
-    actualizarObjetivo 
+    actualizarObjetivo,
+    eliminarObjetivo
 }
 
 from "../services/objetivo.service.js";
@@ -234,6 +235,56 @@ export async function actualizarObjetivoController(
     }
 
     console.error(error);
+
+    return res.status(500).json({
+      error: "Error interno del servidor",
+    });
+  }
+}
+
+
+/*------------------------------------------------------------------------------------- */
+
+export async function eliminarObjetivoController(
+  req: Request,
+  res: Response
+) {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({
+      error: "El ID debe ser un entero positivo",
+    });
+  }
+
+  try {
+    await eliminarObjetivo(id);
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error(error);
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      return res.status(404).json({
+        error: "Objetivo no encontrado",
+      });
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2003"
+    ) {
+      return res.status(409).json({
+        error: "No se puede eliminar el objetivo porque tiene tareas asociadas",
+      });
+    }
 
     return res.status(500).json({
       error: "Error interno del servidor",

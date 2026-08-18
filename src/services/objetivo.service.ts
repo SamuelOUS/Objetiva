@@ -67,3 +67,13 @@ export async function actualizarObjetivo(
     data,
   });
 }
+
+/*------------------------------------------------------------------------------------- */
+
+export async function eliminarObjetivo(id: number) {
+  return prisma.objetivo.delete({
+    where: {
+      id,
+    },
+  });
+}
