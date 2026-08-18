@@ -5,7 +5,8 @@ import {
     crearObjetivoController,
     obtenerObjetivosController,
     obtenerObjetivoPorIdController,
-    actualizarObjetivoController
+    actualizarObjetivoController,
+    eliminarObjetivoController
 
 } 
 
@@ -18,6 +19,6 @@ router.post("/", crearObjetivoController);
 router.get("/", obtenerObjetivosController);
 router.get("/:id", obtenerObjetivoPorIdController);
 router.put("/:id", actualizarObjetivoController);
-
+router.delete("/:id", eliminarObjetivoController);
 
 export default router;
