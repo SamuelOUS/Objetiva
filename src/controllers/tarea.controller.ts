@@ -5,7 +5,8 @@ import {
     crearTarea,
     obtenerTareas,
     obtenerTareaPorId,
-    actualizarTarea
+    actualizarTarea,
+    eliminarTarea
 
 
  } 
@@ -234,6 +235,44 @@ export async function actualizarTareaController(
     ) {
       return res.status(404).json({
         error: "El objetivo indicado no existe",
+      });
+    }
+
+    return res.status(500).json({
+      error: "Error interno del servidor",
+    });
+  }
+}
+
+/*------------------------------------------------------------------------------------- */
+
+export async function eliminarTareaController(
+  req: Request,
+  res: Response
+) {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({
+      error: "El ID debe ser un entero positivo",
+    });
+  }
+
+  try {
+    await eliminarTarea(id);
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error(error);
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      return res.status(404).json({
+        error: "Tarea no encontrada",
       });
     }
 

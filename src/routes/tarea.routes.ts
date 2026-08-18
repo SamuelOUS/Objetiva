@@ -5,7 +5,8 @@ import {
     crearTareaController,
     obtenerTareasController,
     obtenerTareaPorIdController,
-    actualizarTareaController
+    actualizarTareaController,
+    eliminarTareaController
 } 
 
 from "../controllers/tarea.controller.js";
@@ -16,5 +17,6 @@ router.post("/", crearTareaController);
 router.get("/", obtenerTareasController);
 router.get("/:id", obtenerTareaPorIdController);
 router.put("/:id", actualizarTareaController);
+router.delete("/:id", eliminarTareaController);
 
 export default router;
