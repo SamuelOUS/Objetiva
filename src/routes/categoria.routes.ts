@@ -6,7 +6,8 @@ import {
      obtenerCategoriasController, 
      obtenerCategoriaPorIdController,
      actualizarCategoriaController,
-     eliminarCategoriaController
+     eliminarCategoriaController,
+     consultarCategoriasQueryController
 
     } 
     
@@ -19,6 +20,6 @@ router.get("/:id", obtenerCategoriaPorIdController);
 router.post("/", crearCategoriaController);
 router.put("/:id", actualizarCategoriaController);
 router.delete("/:id", eliminarCategoriaController);
-
+(router.query as any)("/", consultarCategoriasQueryController);
 
 export default router;

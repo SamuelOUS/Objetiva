@@ -6,7 +6,8 @@ import {
   obtenerCategorias, 
   obtenerCategoriaPorId,
   actualizarCategoria,
-  eliminarCategoria
+  eliminarCategoria,
+  consultarCategoriasQuery
 
 } 
 
@@ -195,6 +196,37 @@ export async function eliminarCategoriaController(
       }
     }
 
+    console.error(error);
+
+    return res.status(500).json({
+      error: "Error interno del servidor",
+    });
+  }
+}
+
+
+/*------------------------------------------------------------------------------------- */
+
+
+export async function consultarCategoriasQueryController(
+  req: Request,
+  res: Response
+) {
+  const { nombre } = req.body;
+
+  if (nombre !== undefined && typeof nombre !== "string") {
+    return res.status(400).json({
+      error: "El nombre debe ser un texto",
+    });
+  }
+
+  try {
+    const categorias = await consultarCategoriasQuery({
+      nombre,
+    });
+
+    return res.status(200).json(categorias);
+  } catch (error) {
     console.error(error);
 
     return res.status(500).json({
