@@ -11,6 +11,10 @@ interface ActualizarCategoriaData {
   descripcion?: string;
 }
 
+interface ConsultarCategoriasQueryData {
+  nombre?: string;
+}
+
 /*------------------------------------------------------------------------------------- */
 
 export async function crearCategoria(data: CrearCategoriaData) {
@@ -62,6 +66,27 @@ export async function eliminarCategoria(id: number) {
   return prisma.categoria.delete({
     where: {
       id,
+    },
+  });
+}
+
+
+/*------------------------------------------------------------------------------------- */
+
+export async function consultarCategoriasQuery(
+  data: ConsultarCategoriasQueryData
+) {
+  return prisma.categoria.findMany({
+    where: {
+      ...(data.nombre !== undefined && {
+        nombre: {
+          contains: data.nombre,
+          mode: "insensitive",
+        },
+      }),
+    },
+    orderBy: {
+      id: "asc",
     },
   });
 }
