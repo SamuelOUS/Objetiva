@@ -8,7 +8,8 @@ import {
     obtenerObjetivos,
     obtenerObjetivosPorId,
     actualizarObjetivo,
-    eliminarObjetivo
+    eliminarObjetivo,
+    consultarObjetivosQuery
 }
 
 from "../services/objetivo.service.js";
@@ -285,6 +286,54 @@ export async function eliminarObjetivoController(
         error: "No se puede eliminar el objetivo porque tiene tareas asociadas",
       });
     }
+
+    return res.status(500).json({
+      error: "Error interno del servidor",
+    });
+  }
+}
+
+/*------------------------------------------------------------------------------------- */
+
+export async function consultarObjetivosQueryController(
+  req: Request,
+  res: Response
+) {
+  const { estado, categoriaId } = req.body;
+
+  const estadosValidos = [
+    "PENDIENTE",
+    "EN_PROGRESO",
+    "COMPLETADO",
+  ];
+
+  if (
+    estado !== undefined &&
+    (typeof estado !== "string" || !estadosValidos.includes(estado))
+  ) {
+    return res.status(400).json({
+      error: "El estado no es válido",
+    });
+  }
+
+  if (
+    categoriaId !== undefined &&
+    (!Number.isInteger(categoriaId) || categoriaId <= 0)
+  ) {
+    return res.status(400).json({
+      error: "El categoriaId debe ser un entero positivo",
+    });
+  }
+
+  try {
+    const objetivos = await consultarObjetivosQuery({
+      estado,
+      categoriaId,
+    });
+
+    return res.status(200).json(objetivos);
+  } catch (error) {
+    console.error(error);
 
     return res.status(500).json({
       error: "Error interno del servidor",

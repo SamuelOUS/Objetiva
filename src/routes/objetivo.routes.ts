@@ -6,7 +6,8 @@ import {
     obtenerObjetivosController,
     obtenerObjetivoPorIdController,
     actualizarObjetivoController,
-    eliminarObjetivoController
+    eliminarObjetivoController,
+    consultarObjetivosQueryController
 
 } 
 
@@ -20,5 +21,6 @@ router.get("/", obtenerObjetivosController);
 router.get("/:id", obtenerObjetivoPorIdController);
 router.put("/:id", actualizarObjetivoController);
 router.delete("/:id", eliminarObjetivoController);
+(router.query as any)("/", consultarObjetivosQueryController);
 
 export default router;
