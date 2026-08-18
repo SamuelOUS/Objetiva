@@ -1,15 +1,18 @@
 import type { Request, Response } from "express";
 
 import { 
+
   crearCategoria, 
   obtenerCategorias, 
   obtenerCategoriaPorId,
   actualizarCategoria,
   eliminarCategoria
 
-} from "../services/categoria.service.js";
+} 
 
-import { Prisma } from "../generated/prisma/client.js";
+from "../services/categoria.service.js";
+
+
 
 
 
