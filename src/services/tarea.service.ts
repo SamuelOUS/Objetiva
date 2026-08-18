@@ -75,3 +75,13 @@ export async function actualizarTarea(
     },
   });
 }
+
+/*------------------------------------------------------------------------------------- */
+
+export async function eliminarTarea(id: number) {
+  return prisma.tarea.delete({
+    where: {
+      id,
+    },
+  });
+}
