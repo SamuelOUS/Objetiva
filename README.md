@@ -71,19 +71,19 @@ La aplicación utiliza PostgreSQL.
 ### Desarrollo
 
 ```text
-DATABASE_URL=postgresql://objetiva:objetiva@localhost:5432/objetiva?schema=public
+DATABASE_URL=postgresql://<USER>:<PASSWORD>@localhost:5432/<DATABASE>?schema=public
 ```
 
 ### Pruebas
 
 ```text
-DATABASE_URL=postgresql://objetiva:objetiva@localhost:5433/objetiva_test?schema=public
+DATABASE_URL=postgresql://<USER>:<PASSWORD>@localhost:5433/<DATABASE>?schema=public
 ```
 
 ### Producción
 
 ```text
-DATABASE_URL=postgresql://objetiva:objetiva@localhost:5434/objetiva_prod?schema=public
+DATABASE_URL=postgresql://<USER>:<PASSWORD>@localhost:5434/<DATABASE>?schema=public
 ```
 
 > ⚠️ Las variables reales pueden configurarse mediante variables de entorno o secrets. No subir credenciales reales al repositorio.
