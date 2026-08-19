@@ -18,7 +18,7 @@ jobs:
           POSTGRES_PASSWORD: objetiva
           POSTGRES_DB: objetiva_prod
         ports:
-          - 5434:5432
+          - 5432:5432
         options: >-
           --health-cmd="pg_isready -U objetiva -d objetiva_prod"
           --health-interval=10s
@@ -26,8 +26,8 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL: postgresql://objetiva:objetiva@localhost:5434/objetiva_prod?schema=public
-      NODE_ENV: test
+      DATABASE_URL: postgresql://objetiva:objetiva@localhost:5432/objetiva_prod?schema=public
+      NODE_ENV: production
       COVERAGE_THRESHOLD: 85
 
     steps:
@@ -42,7 +42,7 @@ jobs:
           cache: npm
 
       - name: Instalar dependencias
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: Generar Prisma Client
         run: npx prisma generate
