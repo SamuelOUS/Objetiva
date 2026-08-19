@@ -189,7 +189,7 @@ export async function eliminarCategoriaController(
         });
       }
 
-      if (error.code === "P2003") {
+      if (error.code === "P2039") {
         return res.status(409).json({
           error: "No se puede eliminar la categoría porque tiene objetivos asociados",
         });
