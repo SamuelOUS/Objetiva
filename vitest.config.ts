@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 const coverageThreshold = Number(
-  process.env.COVERAGE_THRESHOLD ?? 60
+  process.env.COVERAGE_THRESHOLD ?? 85
 );
 
 export default defineConfig({
