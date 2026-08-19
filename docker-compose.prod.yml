@@ -1,0 +1,29 @@
+services:
+  postgres-prod:
+    image: postgres:18
+    container_name: objetiva-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: objetiva
+      POSTGRES_PASSWORD: objetiva
+      POSTGRES_DB: objetiva_prod
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql
+
+  api-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: objetiva-api-prod
+    depends_on:
+      - postgres-prod
+    environment:
+      DATABASE_URL: postgresql://objetiva:objetiva@postgres-prod:5432/objetiva_prod?schema=public
+      NODE_ENV: production
+    ports:
+      - "3002:3000"
+
+volumes:
+  postgres_prod_data:
