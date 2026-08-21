@@ -92,6 +92,7 @@ export async function eliminarTarea(id: number) {
 }
 
 /*------------------------------------------------------------------------------------- */
+/*------------------------------------------------------------------------------------- */
 
 export async function consultarTareasQuery(data: ConsultarTareasDataQuery) {
   return prisma.tarea.findMany({
