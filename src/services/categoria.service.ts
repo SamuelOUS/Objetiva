@@ -73,6 +73,9 @@ export async function eliminarCategoria(id: number) {
 
 /*------------------------------------------------------------------------------------- */
 
+/*------------------------------------------------------------------------------------- */
+
+
 export async function consultarCategoriasQuery(
   data: ConsultarCategoriasQueryData
 ) {
