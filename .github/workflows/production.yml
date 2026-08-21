@@ -1,0 +1,102 @@
+name: Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  production:
+
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: objetiva
+          POSTGRES_PASSWORD: objetiva
+          POSTGRES_DB: objetiva_prod
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U objetiva -d objetiva_prod"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://objetiva:objetiva@localhost:5432/objetiva_prod?schema=public
+      NODE_ENV: production
+      COVERAGE_THRESHOLD: 85
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --include=dev
+
+      - name: Generar Prisma Client
+        run: npx prisma generate
+
+      - name: Ejecutar migraciones
+        run: npx prisma migrate deploy
+
+      - name: Ejecutar pruebas
+        run: npm test
+
+      - name: Validar cobertura
+        run: npm run test:coverage
+
+      - name: Configurar Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir imagen de producción
+        run: docker compose -f docker-compose.prod.yml build
+
+      - name: Levantar PostgreSQL y API
+        run: docker compose -f docker-compose.prod.yml up -d
+
+      - name: Esperar PostgreSQL
+        run: |
+          for i in {1..30}; do
+            if docker compose -f docker-compose.prod.yml exec -T postgres-prod pg_isready -U objetiva -d objetiva_prod; then
+              echo "PostgreSQL esta listo"
+              break
+            fi
+
+            echo "Esperando PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Ejecutar migraciones de producción
+        run: docker compose -f docker-compose.prod.yml exec -T api-prod npx prisma migrate deploy
+
+      - name: Verificar API
+        run: |
+          for i in {1..30}; do
+            if curl --fail http://localhost:3002; then
+              echo ""
+              echo "API de producción disponible"
+              break
+            fi
+
+            echo "Esperando API..."
+            sleep 2
+          done
+
+      - name: Mostrar logs
+        if: always()
+        run: docker compose -f docker-compose.prod.yml logs
+
+      - name: Detener contenedores
+        if: always()
+        run: docker compose -f docker-compose.prod.yml down -v
