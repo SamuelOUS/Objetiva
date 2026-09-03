@@ -33,7 +33,7 @@ export async function crearTarea(data: CrearTareaData) {
 }
 
 /*------------------------------------------------------------------------------------- */
-/*------------------------------------------------------------------------------------- */
+
 
 export async function obtenerTareas() {
   return prisma.tarea.findMany({
