@@ -20,7 +20,7 @@ metadata:
   namespace: objetiva
 type: Opaque
 stringData:
-  DATABASE_URL: "postgresql://objetivaadmin:lk64.com@objetiva-postgres-prod.postgres.database.azure.com:5432/objetiva?sslmode=require"
+  DATABASE_URL: "REEMPLAZAR_ANTES_DE_APLICAR"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
         - name: objetiva
-          image: objetivaacr.azurecr.io/objetiva:39ed0c9
+          image: objetivaacr.azurecr.io/objetiva:3a5a054
           ports:
             - containerPort: 3000
           envFrom:
