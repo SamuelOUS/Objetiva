@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: objetiva
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: objetiva-config
+  namespace: objetiva
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # Agrega aquí cualquier otra variable NO sensible que use tu API
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: objetiva-secret
+  namespace: objetiva
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://objetivaadmin:lk64.com@objetiva-postgres-prod.postgres.database.azure.com:5432/objetiva?sslmode=require"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: objetiva
+  namespace: objetiva
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: objetiva
+  template:
+    metadata:
+      labels:
+        app: objetiva
+    spec:
+      containers:
+        - name: objetiva
+          image: objetivaacr.azurecr.io/objetiva:39ed0c9
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: objetiva-config
+            - secretRef:
+                name: objetiva-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: objetiva-svc
+  namespace: objetiva
+spec:
+  type: LoadBalancer
+  selector:
+    app: objetiva
+  ports:
+    - port: 80
+      targetPort: 3000
