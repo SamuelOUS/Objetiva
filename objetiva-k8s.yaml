@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
         - name: objetiva
-          image: objetivaacr.azurecr.io/objetiva:3a5a054
+          image: objetivaacr.azurecr.io/objetiva:fbad997
           ports:
             - containerPort: 3000
           envFrom:
