@@ -34,9 +34,10 @@ export async function guardarRespuestaComoBlob(
       blobHTTPHeaders: { blobContentType: "application/json" },
     });
 
+    console.log(`[trace:${traceId}] Respuesta guardada en Object Storage`);
     return blockBlobClient.url;
   } catch (error) {
-    console.error("Error guardando respuesta en Object Storage:", error);
+    console.error(`[trace:${traceId}] Error guardando respuesta en Object Storage:`, error);
     return null;
   }
 }
