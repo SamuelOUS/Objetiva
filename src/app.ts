@@ -4,6 +4,7 @@ import categoriaRoutes from "./routes/categoria.routes.js";
 import objetivoRoutes from "./routes/objetivo.routes.js";
 import tareaRoutes from "./routes/tarea.routes.js";
 import client from "prom-client"
+import { enriquecerConEntidades } from "./middlewares/enriquecer.midleware.js";
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.get("/", (_req, res) => {
 //-------------------------------------------------------------------
 
 const v2 = Router();
+v2.use(enriquecerConEntidades);
 v2.use("/categorias", categoriaRoutes);
 v2.use("/objetivos", objetivoRoutes);
 v2.use("/tareas", tareaRoutes);
