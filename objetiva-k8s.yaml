@@ -13,15 +13,6 @@ data:
   PORT: "3000"
   # Agrega aquí cualquier otra variable NO sensible que use tu API
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: objetiva-secret
-  namespace: objetiva
-type: Opaque
-stringData:
-  DATABASE_URL: "REEMPLAZAR_ANTES_DE_APLICAR"
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -39,7 +30,7 @@ spec:
     spec:
       containers:
         - name: objetiva
-          image: objetivaacr.azurecr.io/objetiva:fbad997
+          image: objetivaacr.azurecr.io/objetiva:ed92a2a
           ports:
             - containerPort: 3000
           envFrom:
