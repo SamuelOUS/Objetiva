@@ -19,14 +19,19 @@ export interface Mascota {
 }
 
 export async function obtenerMascotaAleatoria(traceId?: string): Promise<Mascota | null> {
-  const headers: Record<string, string> = {};
-  if (traceId) headers["x-trace-id"] = traceId;
+  try {
+    const headers: Record<string, string> = {};
+    if (traceId) headers["x-trace-id"] = traceId;
 
-  const response = await fetch(MASCOTAS_API_URL, { headers });
-  if (!response.ok) return null;
+    const response = await fetch(MASCOTAS_API_URL, { headers, signal: AbortSignal.timeout(3000) });
+    if (!response.ok) return null;
 
-  const mascotas: Mascota[] = await response.json();
-  if (mascotas.length === 0) return null;
+    const mascotas: Mascota[] = await response.json();
+    if (mascotas.length === 0) return null;
 
-  return mascotas[Math.floor(Math.random() * mascotas.length)];
+    return mascotas[Math.floor(Math.random() * mascotas.length)];
+  } catch (error) {
+    console.error("Error consultando API de mascotas:", error);
+    return null;
+  }
 }
