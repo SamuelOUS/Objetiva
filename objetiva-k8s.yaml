@@ -13,7 +13,6 @@ data:
   PORT: "3000"
   # Agrega aquí cualquier otra variable NO sensible que use tu API
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
