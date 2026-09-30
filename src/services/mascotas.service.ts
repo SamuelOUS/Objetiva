@@ -20,6 +20,7 @@ export interface Mascota {
 
 export async function obtenerMascotaAleatoria(traceId?: string): Promise<Mascota | null> {
   try {
+    console.log(`[trace:${traceId}] Consultando API de mascotas...`);
     const headers: Record<string, string> = {};
     if (traceId) headers["x-trace-id"] = traceId;
 
@@ -29,9 +30,10 @@ export async function obtenerMascotaAleatoria(traceId?: string): Promise<Mascota
     const mascotas: Mascota[] = await response.json();
     if (mascotas.length === 0) return null;
 
+    console.log(`[trace:${traceId}] Mascota obtenida de API compañero 1`);
     return mascotas[Math.floor(Math.random() * mascotas.length)];
   } catch (error) {
-    console.error("Error consultando API de mascotas:", error);
+    console.error(`[trace:${traceId}] Error consultando API de mascotas:`, error);
     return null;
   }
 }
