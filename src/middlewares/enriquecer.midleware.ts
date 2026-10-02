@@ -12,21 +12,30 @@ export function enriquecerConEntidades(req: Request, res: Response, next: NextFu
       obtenerJuegoAleatorio(res.locals.traceId),
     ])
       .then(([mascota, juego]) => {
-        const base = Array.isArray(body) ? { data: body } : (body as object);
-        const respuestaFinal = {
-          ...base,
-          mascotaCompanero1: mascota,
-          juegoCompanero2: juego,
-        };
+        let respuestaFinal: unknown;
 
-        guardarRespuestaComoBlob(respuestaFinal, res.locals.traceId)
-          .then((url) => console.log("Blob guardado en:", url))
-          .catch((error) => console.error("Error guardando blob:", error));
+        if (Array.isArray(body)) {
+          respuestaFinal = body.map((item) => ({
+            ...(item as object),
+            mascotaCompanero1: mascota,
+            juegoCompanero2: juego,
+          }));
+        } else if (body && typeof body === "object") {
+          respuestaFinal = {
+            ...(body as object),
+            mascotaCompanero1: mascota,
+            juegoCompanero2: juego,
+          };
+        } else {
+          respuestaFinal = body;
+        }
+
+        guardarRespuestaComoBlob(respuestaFinal, res.locals.traceId).catch(() => {});
 
         originalJson(respuestaFinal);
       })
       .catch((error) => {
-        console.error("Error al obtener entidades:", error);
+        console.error(`[trace:${res.locals.traceId}] Error al obtener entidades:`, error);
         originalJson(body);
       });
     return res;
