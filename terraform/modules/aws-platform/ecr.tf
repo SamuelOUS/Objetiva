@@ -1,5 +1,5 @@
 resource "aws_ecr_repository" "api" {
-  name                 = "objetiva-api"
+  name                 = "${var.name}-api"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 

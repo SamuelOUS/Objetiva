@@ -10,12 +10,8 @@ terraform {
 
   backend "s3" {
     bucket       = "objetiva-tfstate-536697249598"
-    key          = "objetiva/terraform.tfstate"
+    key          = "objetiva/dev/terraform.tfstate"
     region       = "us-east-1"
     use_lockfile = true
   }
-}
-
-provider "aws" {
-  region = var.aws_region
 }
