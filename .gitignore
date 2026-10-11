@@ -4,3 +4,8 @@ node_modules/
 dist/
 coverage/
 /src/generated/prisma
+
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
