@@ -4,5 +4,9 @@ node_modules/
 dist/
 coverage/
 /src/generated/prisma
-objetiva-secret.local.yaml
 
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.example.tfvars

@@ -1,0 +1,102 @@
+name: Deploy AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Accion a ejecutar"
+        type: choice
+        options:
+          - apply
+          - destroy
+        default: apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+
+      - name: Crear variables del entorno dev
+        env:
+          DB_PASSWORD: ${{ secrets.TF_VAR_db_password }}
+        run: sed "s/REEMPLAZAR_CON_UN_SECRETO_SEGURO/${DB_PASSWORD}/" environments/dev.example.tfvars > environments/dev.tfvars
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Crear el repositorio ECR
+        if: ${{ inputs.action == 'apply' }}
+        run: terraform apply -auto-approve -input=false -target=module.aws_platform.aws_ecr_repository.api -var-file=environments/dev.tfvars
+
+      - name: Login en ECR
+        if: ${{ inputs.action == 'apply' }}
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construir y subir la imagen
+        if: ${{ inputs.action == 'apply' }}
+        working-directory: .
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/objetiva-dev-api"
+          docker build -t "$IMAGE:latest" -t "$IMAGE:${GITHUB_SHA::7}" .
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${GITHUB_SHA::7}"
+
+      - name: Terraform apply
+        if: ${{ inputs.action == 'apply' }}
+        run: terraform apply -auto-approve -input=false -var-file=environments/dev.tfvars
+
+      - name: Verificar la API
+        if: ${{ inputs.action == 'apply' }}
+        run: |
+          URL=$(terraform output -raw api_url)
+          echo "API desplegada en $URL" >> "$GITHUB_STEP_SUMMARY"
+          for i in $(seq 1 60); do
+            if curl --fail --silent --max-time 5 "$URL" > /dev/null; then
+              echo "API disponible en $URL"
+              exit 0
+            fi
+            echo "Esperando la API ($i/60)..."
+            sleep 10
+          done
+          echo "La API no respondio a tiempo"
+          exit 1
+
+      - name: Terraform destroy
+        if: ${{ inputs.action == 'destroy' }}
+        run: terraform destroy -auto-approve -input=false -var-file=environments/dev.tfvars
