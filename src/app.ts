@@ -6,6 +6,9 @@ import tareaRoutes from "./routes/tarea.routes.js";
 import client from "prom-client"
 import { enriquecerConEntidades } from "./middlewares/enriquecer.midleware.js";
 
+import { crearRouterV3 } from "./v3/v3.router.js";
+import { faultAdminRouter, faultMiddleware } from "./v3/fault.js";
+
 const app = express();
 
 const APP_VERSION = process.env.APP_VERSION ?? "dev";
@@ -70,6 +73,10 @@ app.use((req, res, next) => {
   const traceId = req.header("x-trace-id") ?? randomUUID();
   res.locals.traceId = traceId;
   res.setHeader("x-trace-id", traceId);
+  if (TRACK === "canary") {
+  app.use(faultAdminRouter);
+  app.use(faultMiddleware);
+}
   next();
 });
 
@@ -94,6 +101,7 @@ if (ENRICH_ENABLED) {
 
 app.use("/api/v2", v2);
 
+app.use("/api/v3", crearRouterV3(register));
 app.use("/categorias", categoriaRoutes);
 app.use("/objetivos", objetivoRoutes);
 app.use("/tareas", tareaRoutes);
