@@ -1,8 +1,8 @@
-import app from "../src/app.js";
 import "dotenv/config";
+import app from "./app.js";
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Objetiva API ejecutándose en http://localhost:${PORT}`);
+  console.log(`Objetiva API ejecutándose en el puerto ${PORT}`);
 });

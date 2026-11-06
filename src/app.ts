@@ -8,8 +8,14 @@ import { enriquecerConEntidades } from "./middlewares/enriquecer.midleware.js";
 
 const app = express();
 
+const APP_VERSION = process.env.APP_VERSION ?? "dev";
+const TRACK = process.env.TRACK ?? "stable";
+const ENRICH_ENABLED = process.env.ENRICH_ENABLED === "true";
+
 const register = new client.Registry();
 client.collectDefaultMetrics({ register });
+
+register.setDefaultLabels({ track: TRACK, app_version: APP_VERSION });
 
 const httpRequestDuration = new client.Histogram({
   name: "http_request_duration_seconds",
@@ -17,6 +23,7 @@ const httpRequestDuration = new client.Histogram({
   labelNames: ["method", "route", "status_code"],
   buckets: [0.01, 0.05, 0.1, 0.3, 0.5, 1, 2, 5],
 });
+
 register.registerMetric(httpRequestDuration);
 
 const httpRequestsTotal = new client.Counter({
@@ -27,6 +34,15 @@ const httpRequestsTotal = new client.Counter({
 register.registerMetric(httpRequestsTotal);
 
 app.use(express.json());
+
+
+//-------------------------------------------------------------------
+
+app.use((_req, res, next) => {
+  res.setHeader("X-App-Version", APP_VERSION);
+  res.setHeader("X-Track", TRACK);
+  next();
+});
 
 //-------------------------------------------------------------------
 
@@ -67,16 +83,14 @@ app.get("/metrics", async (_req, res) => {
 //-------------------------------------------------------------------
 
 app.get("/", (_req, res) => {
-  res.json({ message: "API Objetiva funcionando" });
+  res.json({ message: "API Objetiva funcionando", version: APP_VERSION, track: TRACK });
 });
-
 //-------------------------------------------------------------------
 
 const v2 = Router();
-v2.use(enriquecerConEntidades);
-v2.use("/categorias", categoriaRoutes);
-v2.use("/objetivos", objetivoRoutes);
-v2.use("/tareas", tareaRoutes);
+if (ENRICH_ENABLED) {
+  v2.use(enriquecerConEntidades);
+}
 
 app.use("/api/v2", v2);
 
