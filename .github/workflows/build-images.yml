@@ -1,0 +1,59 @@
+name: build-images
+
+on:
+  push:
+    branches: [feature/canary-render]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: objetiva-stable
+            ref: v2.1.0
+            context: .
+            version: 2.1.0
+          - name: objetiva-canary
+            ref: ${{ github.sha }}
+            context: .
+            version: 4.0.0-rc.1
+          - name: objetiva-router
+            ref: ${{ github.sha }}
+            context: router
+            version: 1.0.0
+    steps:
+      - name: Checkout del commit que corresponde a cada imagen
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Dueño del registro en minúsculas
+        run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y publicar
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ghcr.io/${{ env.OWNER }}/${{ matrix.name }}:${{ matrix.version }}
+
+      - name: Registrar el digest (identificador inmutable)
+        run: |
+          echo "ghcr.io/${OWNER}/${{ matrix.name }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
