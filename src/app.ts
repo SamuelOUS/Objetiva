@@ -73,12 +73,14 @@ app.use((req, res, next) => {
   const traceId = req.header("x-trace-id") ?? randomUUID();
   res.locals.traceId = traceId;
   res.setHeader("x-trace-id", traceId);
+
+  next();
+});
+
   if (TRACK === "canary") {
   app.use(faultAdminRouter);
   app.use(faultMiddleware);
-}
-  next();
-});
+  }
 
 //-------------------------------------------------------------------
 
