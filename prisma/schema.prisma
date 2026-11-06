@@ -18,6 +18,12 @@ enum EstadoObjetivo {
   COMPLETADO
 }
 
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+}
+
 model Categoria {
   id          Int        @id @default(autoincrement())
   nombre      String
@@ -45,6 +51,7 @@ model Tarea {
   descripcion String?
   completada  Boolean   @default(false)
   fechaLimite DateTime?
+  prioridad   Prioridad? @default(MEDIA)
 
   objetivoId  Int
   objetivo    Objetivo @relation(fields: [objetivoId], references: [id])
