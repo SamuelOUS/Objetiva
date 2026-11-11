@@ -19,11 +19,11 @@ jobs:
           - name: objetiva-stable
             ref: v2.1.0
             context: .
-            version: 2.1.0
+            version: 2.1.1
           - name: objetiva-canary
             ref: ${{ github.sha }}
             context: .
-            version: 4.0.0-rc.1
+            version: 4.0.0-rc.2
           - name: objetiva-router
             ref: ${{ github.sha }}
             context: router
