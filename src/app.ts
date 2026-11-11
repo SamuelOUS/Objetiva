@@ -92,6 +92,11 @@ if (ENRICH_ENABLED) {
   v2.use(enriquecerConEntidades);
 }
 
+v2.use("/categorias", categoriaRoutes);
+v2.use("/objetivos", objetivoRoutes);
+v2.use("/tareas", tareaRoutes);
+
+
 app.use("/api/v2", v2);
 
 app.use("/categorias", categoriaRoutes);
