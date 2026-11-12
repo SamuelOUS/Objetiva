@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "evaluationIntervalSeconds": 10,
+  "stages": [
+    { "name": "etapa-0-interna", "weight": 0, "bakeSeconds": 30, "minCanaryRequests": 20, "trafficMode": "header" },
+    { "name": "etapa-1", "weight": 10, "bakeSeconds": 60, "minCanaryRequests": 30, "trafficMode": "split" },
+    { "name": "etapa-2", "weight": 50, "bakeSeconds": 60, "minCanaryRequests": 60, "trafficMode": "split" },
+    { "name": "etapa-3-promovido", "weight": 100, "bakeSeconds": 30, "minCanaryRequests": 30, "trafficMode": "split" }
+  ],
+  "slo": {
+    "maxErrorRatePercent": 5,
+    "maxErrorRateIncreasePercentVsStable": 2,
+    "maxP95Seconds": 1.5,
+    "maxP95RatioVsStable": 2
+  },
+  "decision": {
+    "minErrorCountToAbort": 2,
+    "violationsToAbort": 2,
+    "onInsufficientSamples": "extend",
+    "maxExtensions": 3
+  },
+  "load": {
+    "concurrency": 4,
+    "paths": ["/api/categorias", "/api/objetivos", "/api/tareas"]
+  }
+}
