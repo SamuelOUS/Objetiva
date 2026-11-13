@@ -131,6 +131,12 @@ async function manejarRollout(
   path: string
 ) {
   if (!ADMIN_TOKEN || req.headers["x-admin-token"] !== ADMIN_TOKEN) {
+
+    console.log("[admin-debug]", {
+  tokenConfigured: Boolean(ADMIN_TOKEN),
+  headerReceived: Boolean(req.headers["x-admin-token"]),
+  tokenMatches: req.headers["x-admin-token"] === ADMIN_TOKEN
+});
     json(res, 404, { error: "No encontrado" });
     return;
   }
