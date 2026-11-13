@@ -1,6 +1,7 @@
 import http from "node:http";
 import httpProxy from "http-proxy";
 import client from "prom-client";
+import { createController } from "./controller.js";
 
 type Track = "stable" | "canary";
 
@@ -46,6 +47,19 @@ const pesoGauge = new client.Gauge({
   registers: [register],
 });
 pesoGauge.set(canaryWeight);
+
+const controller = createController({
+  register,
+  port: PORT,
+  stableUrl: STABLE_URL,
+  canaryUrl: CANARY_URL,
+  getWeight: () => canaryWeight,
+  setWeight: (percent: number) => {
+    canaryWeight = percent;
+    pesoGauge.set(percent);
+    console.log(`[router] canaryWeight = ${percent}%`);
+  },
+});
 
 // ---------- Proxy ----------
 const proxy = httpProxy.createProxyServer({
@@ -111,6 +125,40 @@ async function manejarPeso(req: http.IncomingMessage, res: http.ServerResponse) 
   json(res, 405, { error: "Método no permitido" });
 }
 
+async function manejarRollout(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  path: string
+) {
+  if (!ADMIN_TOKEN || req.headers["x-admin-token"] !== ADMIN_TOKEN) {
+    json(res, 404, { error: "No encontrado" });
+    return;
+  }
+
+  if (path === "/admin/rollout/status" && req.method === "GET") {
+    json(res, 200, controller.status());
+    return;
+  }
+
+  if (path === "/admin/rollout/start" && req.method === "POST") {
+    try {
+      controller.start();
+      json(res, 202, controller.status());
+    } catch (e) {
+      json(res, 409, { error: (e as Error).message });
+    }
+    return;
+  }
+
+  if (path === "/admin/rollout/abort" && req.method === "POST") {
+    controller.abort("abortado manualmente");
+    json(res, 200, controller.status());
+    return;
+  }
+
+  json(res, 404, { error: "No encontrado" });
+}
+
 // ---------- Servidor ----------
 const server = http.createServer(async (req, res) => {
   const url = req.url ?? "/";
@@ -125,6 +173,11 @@ const server = http.createServer(async (req, res) => {
   if (path === "/metrics") {
     res.writeHead(200, { "content-type": register.contentType });
     res.end(await register.metrics());
+    return;
+  }
+
+  if (path.startsWith("/admin/rollout/")) {
+    await manejarRollout(req, res, path);
     return;
   }
 
