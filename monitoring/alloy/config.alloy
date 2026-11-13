@@ -1,10 +1,10 @@
 prometheus.scrape "objetiva" {
   targets = [
     {
-      "__address__" = sys.env("STABLE_METRICS_HOST"),
+      "__address__" = sys.env("STABLE_METRICS_HOST") + ":443",
     },
     {
-      "__address__" = sys.env("CANARY_METRICS_HOST"),
+      "__address__" = sys.env("CANARY_METRICS_HOST") + ":443",
     },
   ]
 
