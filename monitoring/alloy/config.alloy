@@ -1,0 +1,27 @@
+prometheus.scrape "objetiva" {
+  targets = [
+    {
+      "__address__" = sys.env("STABLE_METRICS_HOST"),
+    },
+    {
+      "__address__" = sys.env("CANARY_METRICS_HOST"),
+    },
+  ]
+
+  scheme          = "https"
+  metrics_path    = "/metrics"
+  scrape_interval = "60s"
+
+  forward_to = [prometheus.remote_write.grafana.receiver]
+}
+
+prometheus.remote_write "grafana" {
+  endpoint {
+    url = sys.env("GRAFANA_REMOTE_WRITE_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_USERNAME")
+      password = sys.env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
