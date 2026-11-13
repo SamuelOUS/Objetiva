@@ -11,7 +11,8 @@
     "maxErrorRatePercent": 5,
     "maxErrorRateIncreasePercentVsStable": 2,
     "maxP95Seconds": 1.5,
-    "maxP95RatioVsStable": 2
+    "maxP95RatioVsStable": 2,
+    "minP95SecondsForRatioCheck": 0.5
   },
   "decision": {
     "minErrorCountToAbort": 2,
