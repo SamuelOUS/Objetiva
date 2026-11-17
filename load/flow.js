@@ -8,10 +8,12 @@ const functionalErrors = new Rate("functional_errors");
 const requestLatency = new Trend("request_latency_ms", true);
 
 const baseUrl = (__ENV.BASE_URL || "").replace(/\/$/, "");
-const endpoint = __ENV.ENDPOINT || "/api/v3/tareas";
+const endpoint = __ENV.ENDPOINT || "/demo/flujo";
 
 if (!baseUrl) {
-  throw new Error("Debes indicar BASE_URL mediante -e BASE_URL=...");
+  throw new Error(
+    "Debes indicar BASE_URL mediante -e BASE_URL=..."
+  );
 }
 
 export const options = {
@@ -23,25 +25,37 @@ export const options = {
       duration: `${profile.durationSeconds}s`,
       preAllocatedVUs: profile.preAllocatedVUs,
       maxVUs: profile.maxVUs,
-      gracefulStop: "20s"
-    }
+      gracefulStop: "20s",
+    },
   },
   tags: {
     experiment: __ENV.EXPERIMENT || "healthy",
-    round: __ENV.ROUND || "baseline"
+    round: __ENV.ROUND || "baseline",
   },
   thresholds: {
-    // Si k6 no sostuvo la carga, la ejecución no es comparable.
-    dropped_iterations: ["count==0"]
-  }
+    dropped_iterations: ["count==0"],
+  },
 };
 
 function validResponse(response) {
   if (response.status !== 200) return false;
 
   try {
-    // Contrato esperado de GET /api/v3/tareas.
-    return Array.isArray(response.json());
+    const body = response.json();
+
+    if (!Array.isArray(body)) return false;
+
+    if (endpoint === "/demo/flujo") {
+      return (
+        body.length === 1 &&
+        typeof body[0].traceId === "string" &&
+        body[0].localTask?.id !== undefined &&
+        body[0].dependencyTask?.id !== undefined &&
+        body[0].degraded === false
+      );
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -49,20 +63,24 @@ function validResponse(response) {
 
 export function setup() {
   const response = http.get(`${baseUrl}${endpoint}`, {
-    headers: { "x-canary": "true" },
+    headers: {
+      "x-canary": "true",
+    },
     timeout: "15s",
-    tags: { name: "preflight" }
+    tags: {
+      name: "preflight",
+    },
   });
 
   if (!validResponse(response)) {
     throw new Error(
       `Preflight falló: HTTP ${response.status}. ` +
-      "Comprueba la URL, el endpoint y su respuesta JSON."
+      "Comprueba la configuración y la respuesta del endpoint."
     );
   }
 
   return {
-    runId: `${__ENV.EXPERIMENT || "healthy"}-${Date.now()}`
+    runId: `${__ENV.EXPERIMENT || "healthy"}-${Date.now()}`,
   };
 }
 
@@ -70,18 +88,18 @@ export default function (data) {
   const response = http.get(`${baseUrl}${endpoint}`, {
     headers: {
       "x-canary": "true",
-      "x-trace-id": `${data.runId}-${__VU}-${__ITER}`
+      "x-trace-id": `${data.runId}-${__VU}-${__ITER}`,
     },
     timeout: "15s",
     tags: {
-      name: "GET tareas"
-    }
+      name: `GET ${endpoint}`,
+    },
   });
 
   const valid = validResponse(response);
 
   check(response, {
-    "HTTP 200 con arreglo JSON": () => valid
+    "Respuesta funcional válida": () => valid,
   });
 
   functionalErrors.add(!valid);

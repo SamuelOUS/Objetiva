@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 
-const TARGET_PATH = "/api/v3/tareas";
+const TARGET_PATH = "/demo/flujo";
 const MAX_DURATION_SECONDS = 120;
 
 type FaultState = {
@@ -43,12 +43,15 @@ function resetFault(reason: string): void {
 }
 
 function currentState(): FaultState {
-  // Respaldo si el event loop demoró la ejecución del temporizador.
   if (state.expiresAt > 0 && Date.now() >= state.expiresAt) {
     resetFault("expired");
   }
 
   return { ...state };
+}
+
+export function getFaultState(): FaultState {
+  return currentState();
 }
 
 export const faultAdminRouter = Router();
@@ -68,6 +71,7 @@ faultAdminRouter.get("/admin/fault", (_req, res) => {
   res.json({
     ...currentState(),
     target: `GET ${TARGET_PATH}`,
+    location: process.env.FAULT_LOCATION ?? "incoming",
   });
 });
 
@@ -106,9 +110,23 @@ faultAdminRouter.post("/admin/fault", (req, res) => {
     return;
   }
 
+  if (
+    process.env.FAULT_LOCATION === "outgoing" &&
+    errorRate > 0
+  ) {
+    res.status(400).json({
+      error:
+        "Esta versión del adaptador saliente solo implementa latencia. " +
+        "Usar errorRate=0.",
+    });
+    return;
+  }
+
   if (currentState().expiresAt > 0) {
     res.status(409).json({
-      error: "Ya existe un experimento activo. Revierte antes de iniciar otro.",
+      error:
+        "Ya existe un experimento activo. " +
+        "Revierte antes de iniciar otro.",
     });
     return;
   }
@@ -134,6 +152,7 @@ faultAdminRouter.post("/admin/fault", (req, res) => {
     event: "chaos.activated",
     ...state,
     target: `GET ${TARGET_PATH}`,
+    location: process.env.FAULT_LOCATION ?? "incoming",
     timestamp: new Date().toISOString(),
   }));
 
@@ -145,6 +164,12 @@ export async function faultMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  // La latencia saliente se aplica dentro del adaptador HTTP.
+  if (process.env.FAULT_LOCATION === "outgoing") {
+    next();
+    return;
+  }
+
   if (req.method !== "GET" || req.path !== TARGET_PATH) {
     next();
     return;
@@ -157,22 +182,12 @@ export async function faultMiddleware(
     return;
   }
 
-  console.log(JSON.stringify({
-    event: "chaos.request",
-    experimentId: snapshot.experimentId,
-    traceId: res.locals.traceId ?? req.header("x-trace-id"),
-    latencyMs: snapshot.latencyMs,
-    errorRate: snapshot.errorRate,
-    timestamp: new Date().toISOString(),
-  }));
-
   if (snapshot.latencyMs > 0) {
     await new Promise<void>((resolve) => {
       setTimeout(resolve, snapshot.latencyMs);
     });
   }
 
-  // No producir un nuevo error si el fallo expiró o fue revertido.
   const active = currentState();
 
   if (
