@@ -77,10 +77,13 @@ app.use((req, res, next) => {
   next();
 });
 
-  if (TRACK === "canary") {
+if (
+  TRACK === "canary" &&
+  process.env.CHAOS_ENABLED === "true"
+) {
   app.use(faultAdminRouter);
   app.use(faultMiddleware);
-  }
+}
 
 //-------------------------------------------------------------------
 

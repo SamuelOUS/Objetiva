@@ -2,7 +2,7 @@ name: build-images
 
 on:
   push:
-    branches: [feature/canary-render]
+    branches: [feature/canary-render, feature/chaos-injection]
   workflow_dispatch:
 
 permissions:
