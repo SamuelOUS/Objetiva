@@ -5,7 +5,10 @@ import { Rate, Trend } from "k6/metrics";
 const profile = JSON.parse(open("./profile.json"));
 
 const functionalErrors = new Rate("functional_errors");
+const degradedResponses = new Rate("degraded_responses");
 const requestLatency = new Trend("request_latency_ms", true);
+
+const CACHE_MAX_AGE_MS = 300000;
 
 const baseUrl = (__ENV.BASE_URL || "").replace(/\/$/, "");
 const endpoint = __ENV.ENDPOINT || "/demo/flujo";
@@ -37,27 +40,57 @@ export const options = {
   },
 };
 
-function validResponse(response) {
-  if (response.status !== 200) return false;
+function inspectResponse(response) {
+  const invalid = { valid: false, degraded: false };
+
+  if (response.status !== 200) return invalid;
 
   try {
     const body = response.json();
 
-    if (!Array.isArray(body)) return false;
+    if (!Array.isArray(body)) return invalid;
 
-    if (endpoint === "/demo/flujo") {
-      return (
-        body.length === 1 &&
-        typeof body[0].traceId === "string" &&
-        body[0].localTask?.id !== undefined &&
-        body[0].dependencyTask?.id !== undefined &&
-        body[0].degraded === false
-      );
+    if (endpoint !== "/demo/flujo") {
+      return { valid: true, degraded: false };
     }
 
-    return true;
+    if (body.length !== 1) return invalid;
+
+    const item = body[0];
+
+    const hasEntities =
+      typeof item.traceId === "string" &&
+      item.localTask?.id !== undefined &&
+      item.dependencyTask?.id !== undefined;
+
+    if (!hasEntities) return invalid;
+
+    if (item.degraded === false) {
+      return { valid: true, degraded: false };
+    }
+
+    if (item.degraded === true) {
+      const metadata = item.degradation;
+
+      const validCache =
+        metadata?.source === "cache" &&
+        Number.isFinite(metadata.cacheAgeMs) &&
+        metadata.cacheAgeMs >= 0 &&
+        metadata.cacheAgeMs <= CACHE_MAX_AGE_MS &&
+        (
+          metadata.reason === "DEPENDENCY_TIMEOUT" ||
+          metadata.reason === "DEPENDENCY_FAILURE"
+        );
+
+      return {
+        valid: validCache,
+        degraded: true,
+      };
+    }
+
+    return invalid;
   } catch {
-    return false;
+    return invalid;
   }
 }
 
@@ -72,10 +105,10 @@ export function setup() {
     },
   });
 
-  if (!validResponse(response)) {
+  if (!inspectResponse(response).valid) {
     throw new Error(
       `Preflight falló: HTTP ${response.status}. ` +
-      "Comprueba la configuración y la respuesta del endpoint."
+      "Comprueba la configuración y los datos del flujo."
     );
   }
 
@@ -96,12 +129,13 @@ export default function (data) {
     },
   });
 
-  const valid = validResponse(response);
+  const result = inspectResponse(response);
 
   check(response, {
-    "Respuesta funcional válida": () => valid,
+    "Respuesta funcional válida": () => result.valid,
   });
 
-  functionalErrors.add(!valid);
+  functionalErrors.add(!result.valid);
+  degradedResponses.add(result.degraded);
   requestLatency.add(response.timings.duration);
 }
