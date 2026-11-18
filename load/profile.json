@@ -1,6 +1,6 @@
 {
   "rate": 5,
   "durationSeconds": 360,
-  "preAllocatedVUs": 10,
+  "preAllocatedVUs": 30,
   "maxVUs": 30
 }

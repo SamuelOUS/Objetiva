@@ -83,6 +83,9 @@ def hypothesis(p95_limit_ms=500):
     if RESULT is None:
         return healthy()
 
+    if RESULT.get("status") != "complete":
+        return False
+
     return bool(
         RESULT["valid_load"]
         and RESULT["recovered"]
@@ -146,9 +149,9 @@ def run_latency(
     inject_after_seconds=120,
 ):
     global RESULT, OWNED
-    RESULT = None
+    RESULT = {"status": "running"}
 
-    if not 10 < duration_seconds <= 120:
+    if not 30 < duration_seconds <= 120:
         raise ValueError("La duración debe estar entre 11 y 120 segundos")
 
     if inject_after_seconds <= 60:
@@ -214,7 +217,7 @@ def run_latency(
         ),
         "latency_ms": latency_ms,
         "duration_seconds": duration_seconds,
-        "measurement_seconds": duration_seconds - 10,
+        "measurement_seconds": duration_seconds - 30,
     }
 
     (folder / "manifest.json").write_text(
@@ -345,15 +348,15 @@ def run_latency(
                     "No se confirmaron los parámetros del fallo"
                 )
 
-            if control_rtt >= 5:
+            if control_rtt >= 15:
                 raise RuntimeError(
                     "La activación tardó demasiado para medir "
                     "una ventana comparable"
                 )
 
             # Solo se usa el reloj del generador para medir.
-            start = acknowledged_at + 5
-            end = acknowledged_at + duration_seconds - 5
+            start = acknowledged_at + 15
+            end = acknowledged_at + duration_seconds - 15
 
             event(
                 "fault.activated",
@@ -449,6 +452,7 @@ def run_latency(
         )
 
         RESULT = {
+            "status": "complete",
             "round": round_value,
             "injection": injection,
             "baseline": baseline,
@@ -467,8 +471,18 @@ def run_latency(
         print(f"Evidencia: {folder}")
         return RESULT
 
-    except BaseException:
-        event("run.aborted")
+    except BaseException as exc:
+        RESULT = {
+            "status": "aborted",
+            "reason": str(exc),
+        }
+
+        (folder / "result.json").write_text(
+            json.dumps(RESULT, indent=2),
+            encoding="utf-8",
+        )
+
+        event("run.aborted", reason=str(exc))
         raise
 
     finally:

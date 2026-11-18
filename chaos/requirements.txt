@@ -1,0 +1,2 @@
+chaostoolkit==1.19.0
+chaostoolkit-lib==1.45.1

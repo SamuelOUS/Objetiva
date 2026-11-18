@@ -1,0 +1,206 @@
+name: Chaos quality gate
+
+on:
+  push:
+    branches:
+      - feature/chaos-injection
+    paths:
+      - ".github/workflows/chaos-gate.yml"
+      - "chaos/**"
+      - "chaos_runner.py"
+      - "load/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: objetiva-chaos-canary
+  cancel-in-progress: false
+
+jobs:
+  chaos-gate:
+    name: Verify deployed canary resilience
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      BASE_URL: https://objetiva-canaryatsha256.onrender.com
+      ENDPOINT: /demo/flujo
+      ROUND: "1"
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Chaos Toolkit
+        run: python -m pip install -r chaos/requirements.txt
+
+      - name: Install k6
+        env:
+          K6_VERSION: "2.4.0"
+        run: |
+          set -euo pipefail
+
+          curl -fsSL --retry 3 \
+            "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz" \
+            -o "$RUNNER_TEMP/k6.tar.gz"
+
+          tar -xzf "$RUNNER_TEMP/k6.tar.gz" -C "$RUNNER_TEMP"
+
+          echo "$RUNNER_TEMP/k6-v${K6_VERSION}-linux-amd64" >> "$GITHUB_PATH"
+
+      - name: Prepare isolated evidence directory
+        run: |
+          mkdir -p .gate-run/evidence
+          ln -s "$GITHUB_WORKSPACE/load" .gate-run/load
+
+      - name: Validate experiment
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: chaos validate chaos/latency.json
+
+      - name: Execute declarative experiment
+        working-directory: .gate-run
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          FAULT_TOKEN: ${{ secrets.CHAOS_FAULT_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${FAULT_TOKEN:-}" ]; then
+            echo "::error::Missing CHAOS_FAULT_TOKEN secret"
+            exit 1
+          fi
+
+          set +e
+
+          chaos run \
+            --rollback-strategy always \
+            --journal-path journal.json \
+            "$GITHUB_WORKSPACE/chaos/latency.json"
+
+          code=$?
+
+          printf '%s\n' "$code" > cli-exit-code.txt
+
+          # La siguiente etapa verifica expresamente el resultado.
+          exit 0
+
+      - name: Enforce quality gate
+        env:
+          GATE_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(".gate-run")
+
+          def fail(message):
+              print(f"::error::{message}")
+              raise SystemExit(1)
+
+          exit_file = root / "cli-exit-code.txt"
+
+          if not exit_file.exists():
+              fail("The experiment did not finish its execution step")
+
+          cli_exit = int(exit_file.read_text().strip())
+
+          files = list((root / "evidence").glob("latency-*/result.json"))
+
+          if len(files) != 1:
+              fail(f"Expected one result, found {len(files)}")
+
+          result = json.loads(files[0].read_text(encoding="utf-8"))
+
+          experiment = json.loads(
+              Path("chaos/latency.json").read_text(encoding="utf-8")
+          )
+
+          limit = experiment["measurement"]["threshold_ms"]
+
+          checks = {
+              "chaos_cli_success": cli_exit == 0,
+              "execution_complete": result.get("status") == "complete",
+              "correct_round": result.get("round") == "1",
+              "valid_load": result.get("valid_load") is True,
+              "recovered": result.get("recovered") is True,
+          }
+
+          injection = result.get("injection", {})
+          p95 = injection.get("p95_ms")
+          errors = injection.get("error_rate")
+          samples = injection.get("samples", 0)
+          dropped = injection.get("dropped_iterations")
+
+          checks.update({
+              "has_samples": samples > 0,
+              "no_dropped_iterations": dropped == 0,
+              "no_functional_errors": errors == 0,
+              "p95_within_budget": (
+                  isinstance(p95, (int, float))
+                  and p95 <= limit
+              ),
+          })
+
+          report = {
+              "target": os.environ["BASE_URL"],
+              "test_source_sha": os.environ["GATE_SOURCE_SHA"],
+              "threshold_ms": limit,
+              "p95_ms": p95,
+              "checks": checks,
+              "passed": all(checks.values()),
+          }
+
+          (root / "gate-result.json").write_text(
+              json.dumps(report, indent=2),
+              encoding="utf-8",
+          )
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("# Chaos quality gate\n\n")
+              summary.write(f"- Target: {report['target']}\n")
+              summary.write(f"- p95: {p95} ms\n")
+              summary.write(f"- Threshold: {limit} ms\n\n")
+              summary.write("| Check | Result |\n|---|---|\n")
+
+              for name, passed in checks.items():
+                  summary.write(
+                      f"| {name} | {'PASS' if passed else 'FAIL'} |\n"
+                  )
+
+          print(json.dumps(report, indent=2))
+
+          if not report["passed"]:
+              fail("Resilience quality gate failed")
+          PY
+
+      - name: Upload evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-gate-${{ github.run_id }}
+          path: .gate-run/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  acceptance:
+    name: Accept tested deployment
+    needs: chaos-gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Record acceptance
+        run: |
+          echo "The deployed canary passed the chaos quality gate." >> "$GITHUB_STEP_SUMMARY"
+          echo "This stage only runs when chaos-gate succeeds." >> "$GITHUB_STEP_SUMMARY"

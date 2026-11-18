@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "title": "Latencia en la llamada saliente de Objetiva",
-  "description": "Con el perfil fijo de 5 solicitudes por segundo durante 360 segundos, al añadir 1500 ms en el adaptador de la llamada saliente durante 120 segundos, el flujo mantendrá p95 <=500 ms en la ventana central de 110 segundos, sin errores funcionales. El umbral es provisional hasta medir el flujo saludable. Render hacia Render valida el mecanismo; la llamada entre nubes requiere cambiar la dependencia a Azure.",
+  "description": "Con 5 solicitudes por segundo durante 360 segundos, al añadir 1500 ms a la llamada saliente durante 120 segundos, el flujo mantendrá p95 <=1000 ms durante los 90 segundos centrales, sin errores funcionales. El umbral se fijó antes de una ronda válida. La dependencia actual está en Render.",
   "steady-state-hypothesis": {
     "title": "Flujo saludable antes; p95 dentro del umbral durante la inyección y recuperación después",
     "probes": [
@@ -14,7 +14,7 @@
           "module": "chaos_runner",
           "func": "hypothesis",
           "arguments": {
-            "p95_limit_ms": 500
+            "p95_limit_ms": 1000
           }
         }
       }
@@ -54,20 +54,26 @@
       "k6 termina prematuramente",
       "Administración o liveness inaccesibles",
       "El experimento activo cambia o desaparece antes de tiempo",
-      "La activación tarda cinco segundos o más"
+      "La activación tarda quince segundos o más"
     ],
     "automatic_reversion": "TTL del servicio, limpieza en finally y rollback de Chaos Toolkit"
   },
   "steady_state": {
-    "status": "Pendiente de medición del nuevo flujo. El baseline anterior de /api/v3/tareas no se reutiliza.",
-    "measured_values": null
+    "status": "Baseline del flujo medido antes de ronda 0",
+    "measured_values": {
+      "p95_ms": 607.67,
+      "functional_error_rate": 0,
+      "dropped_iterations": 0,
+      "iterations": 1800,
+      "evidence": "evidence/flow-baseline-20261117-221341"
+    }
   },
   "measurement": {
     "metric": "p95_ms",
     "instrument": "k6 request_latency_ms en samples.jsonl",
-    "window": "Respuestas completadas durante los 110 segundos centrales del fallo, usando el reloj del generador",
-    "window_seconds": 110,
-    "threshold_ms": 500,
-    "threshold_status": "Provisional; ratificar antes de las rondas comparativas"
+    "window": "Respuestas completadas durante los 90 segundos centrales del fallo, usando exclusivamente el reloj del generador",
+    "window_seconds": 90,
+    "threshold_ms": 1000,
+    "threshold_status": "Fijado antes de ronda 0 a partir del baseline medido del flujo"
   }
 }
