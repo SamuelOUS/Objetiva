@@ -1,0 +1,81 @@
+{
+  "version": "1.0.0",
+  "title": "Agotamiento del pool de concurrencia",
+  "description": "Con 5 solicitudes/s durante 360 segundos, al ocupar los cuatro permisos del pool de dependencia durante 120 segundos, el flujo mantendrá una tasa de error funcional <=1% durante los 90 segundos centrales. El modo protegido utiliza control de admisión inmediato y degradación con cache de hasta cinco minutos.",
+  "steady-state-hypothesis": {
+    "title": "Flujo saludable antes y tasa de error <=1% durante el fallo",
+    "probes": [
+      {
+        "type": "probe",
+        "name": "verify-availability",
+        "tolerance": true,
+        "provider": {
+          "type": "python",
+          "module": "chaos_runner",
+          "func": "availability_hypothesis",
+          "arguments": {
+            "max_error_rate": 0.01
+          }
+        }
+      }
+    ]
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "reserve-dependency-permits",
+      "provider": {
+        "type": "python",
+        "module": "chaos_runner",
+        "func": "run_fault",
+        "arguments": {
+          "latency_ms": 0,
+          "error_rate": 0,
+          "resource_slots": 4,
+          "duration_seconds": 120,
+          "inject_after_seconds": 120
+        }
+      }
+    }
+  ],
+  "rollbacks": [
+    {
+      "type": "action",
+      "name": "revert-owned-fault",
+      "provider": {
+        "type": "python",
+        "module": "chaos_runner",
+        "func": "rollback"
+      }
+    }
+  ],
+  "scope": {
+    "blast_radius": "Cuatro permisos del pool de llamadas salientes de GET /demo/flujo en una instancia canary. No se agota CPU/RAM ni se modifica stable.",
+    "duration_seconds": 120,
+    "abort_conditions": [
+      "k6 termina prematuramente",
+      "Administración o liveness inaccesibles",
+      "Experimento activo cambia o desaparece antes de tiempo",
+      "Activación tarda quince segundos o más"
+    ],
+    "automatic_reversion": "TTL, limpieza en finally y rollback de Chaos Toolkit"
+  },
+  "measurement": {
+    "metric": "functional_error_rate",
+    "threshold": 0.01,
+    "instrument": "k6 functional_errors en samples.jsonl",
+    "window_seconds": 90
+  },
+  "steady_state": {
+    "reference": "Las mediciones previas del flujo mostraron 0% de errores. El ejecutor conserva además el baseline de cada ronda.",
+    "functional_error_rate": 0
+  },
+  "resource": {
+    "name": "dependency_concurrency_pool",
+    "capacity": 4,
+    "reserved_slots": 4,
+    "evidence": "pool.usedSlots y pool.availableSlots en la activación",
+    "unprotected_wait_ms": 2000,
+    "protected_wait_ms": 0
+  }
+}

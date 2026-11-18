@@ -148,6 +148,7 @@ def run_fault(
     duration_seconds=120,
     inject_after_seconds=120,
     error_rate=0,
+    resource_slots=0,
 ):
     global RESULT, OWNED
     RESULT = {"status": "running"}
@@ -191,6 +192,7 @@ def run_fault(
         raise RuntimeError("El flujo no está saludable")
 
     experiment_name = (
+        "resources" if resource_slots > 0 else
         "dependency" if error_rate > 0 else "latency"
     )
     run_id = f"{experiment_name}-{time.time_ns()}"
@@ -221,6 +223,7 @@ def run_fault(
         ),
         "latency_ms": latency_ms,
         "error_rate": error_rate,
+        "resource_slots": resource_slots,
         "duration_seconds": duration_seconds,
         "measurement_seconds": duration_seconds - 30,
     }
@@ -233,9 +236,9 @@ def run_fault(
     env = dict(
         os.environ,
         EXPERIMENT=(
-            "dependency-unavailable"
-            if error_rate > 0
-            else "outgoing-latency"
+            "resource-exhaustion" if resource_slots > 0 else
+            "dependency-unavailable" if error_rate > 0 else
+            "outgoing-latency"
         ),
         ROUND=round_value,
         ENDPOINT=endpoint(),
@@ -337,6 +340,7 @@ def run_fault(
                 {
                     "experimentId": run_id,
                     "errorRate": error_rate,
+                    "resourceSlots": resource_slots,
                     "latencyMs": latency_ms,
                     "durationSeconds": duration_seconds,
                 },
@@ -350,6 +354,7 @@ def run_fault(
                 result.get("experimentId") != run_id
                 or result.get("latencyMs") != latency_ms
                 or result.get("errorRate") != error_rate
+                or result.get("resourceSlots", 0) != resource_slots
                 or result.get("expiresAt", 0)
                 - result.get("startedAt", 0)
                 != duration_seconds * 1000

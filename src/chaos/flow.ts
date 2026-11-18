@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { getFaultState } from "../v3/fault.js";
+import { acquirePermit } from "./pool.js";
 
 export const flowRouter = Router();
 
@@ -85,7 +86,13 @@ flowRouter.get("/flujo", async (_req, res) => {
       timestamp: new Date().toISOString(),
     }));
 
+    let releasePermit: (() => void) | null = null;
+
     try {
+      releasePermit = await acquirePermit(
+        resilienceEnabled ? 0 : 2000,
+        signal
+      );
       // La cancelación cubre tanto el retraso artificial
       // como la petición HTTP y la lectura de su respuesta.
       if (fault && fault.latencyMs > 0) {
@@ -212,6 +219,8 @@ flowRouter.get("/flujo", async (_req, res) => {
           },
         },
       ]);
+    } finally {
+      releasePermit?.();
     }
   } catch (error) {
     console.error(JSON.stringify({

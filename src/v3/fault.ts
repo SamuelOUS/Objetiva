@@ -1,4 +1,11 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { setTimeout as delay } from "node:timers/promises";
+
+import {
+  POOL_CAPACITY,
+  poolState,
+  reservePermits,
+} from "../chaos/pool.js";
 
 const TARGET_PATH = "/demo/flujo";
 const MAX_DURATION_SECONDS = 120;
@@ -7,6 +14,7 @@ type FaultState = {
   experimentId: string;
   errorRate: number;
   latencyMs: number;
+  resourceSlots: number;
   startedAt: number;
   expiresAt: number;
 };
@@ -16,6 +24,7 @@ function emptyState(): FaultState {
     experimentId: "",
     errorRate: 0,
     latencyMs: 0,
+    resourceSlots: 0,
     startedAt: 0,
     expiresAt: 0,
   };
@@ -23,34 +32,44 @@ function emptyState(): FaultState {
 
 let state = emptyState();
 let expirationTimer: ReturnType<typeof setTimeout> | undefined;
+let releaseReservation: (() => void) | null = null;
+let pendingActivation = false;
+let generation = 0;
 
 function resetFault(reason: string): void {
   const experimentId = state.experimentId;
+  generation += 1;
 
   if (expirationTimer) {
     clearTimeout(expirationTimer);
     expirationTimer = undefined;
   }
 
+  releaseReservation?.();
+  releaseReservation = null;
   state = emptyState();
 
   console.log(JSON.stringify({
     event: "chaos.reverted",
     experimentId,
     reason,
+    pool: poolState(),
     timestamp: new Date().toISOString(),
   }));
 }
 
-function currentState(): FaultState {
+function currentState() {
   if (state.expiresAt > 0 && Date.now() >= state.expiresAt) {
     resetFault("expired");
   }
 
-  return { ...state };
+  return {
+    ...state,
+    pool: poolState(),
+  };
 }
 
-export function getFaultState(): FaultState {
+export function getFaultState() {
   return currentState();
 }
 
@@ -72,6 +91,7 @@ faultAdminRouter.get("/admin/fault", (_req, res) => {
     ...currentState(),
     target: `GET ${TARGET_PATH}`,
     location: process.env.FAULT_LOCATION ?? "incoming",
+    pendingActivation,
   });
 });
 
@@ -80,11 +100,12 @@ faultAdminRouter.delete("/admin/fault", (_req, res) => {
   res.json(currentState());
 });
 
-faultAdminRouter.post("/admin/fault", (req, res) => {
+faultAdminRouter.post("/admin/fault", async (req, res) => {
   const {
     experimentId,
     errorRate,
     latencyMs,
+    resourceSlots = 0,
     durationSeconds,
   } = req.body ?? {};
 
@@ -97,6 +118,9 @@ faultAdminRouter.post("/admin/fault", (req, res) => {
     Number.isFinite(latencyMs) &&
     latencyMs >= 0 &&
     latencyMs <= 5000 &&
+    Number.isInteger(resourceSlots) &&
+    resourceSlots >= 0 &&
+    resourceSlots <= POOL_CAPACITY &&
     Number.isInteger(durationSeconds) &&
     durationSeconds >= 1 &&
     durationSeconds <= MAX_DURATION_SECONDS;
@@ -104,48 +128,83 @@ faultAdminRouter.post("/admin/fault", (req, res) => {
   if (!valid) {
     res.status(400).json({
       error:
-        "Se requieren experimentId válido, errorRate [0,1], " +
-        "latencyMs [0,5000] y durationSeconds entero [1,120]",
+        "Parámetros inválidos: errorRate [0,1], latencyMs [0,5000], " +
+        "resourceSlots entero [0,4], durationSeconds entero [1,120] " +
+        "y experimentId válido requeridos.",
     });
     return;
   }
 
-
-  if (currentState().expiresAt > 0) {
+  if (currentState().expiresAt > 0 || pendingActivation) {
     res.status(409).json({
-      error:
-        "Ya existe un experimento activo. " +
-        "Revierte antes de iniciar otro.",
+      error: "Ya existe un experimento activo o en activación",
     });
     return;
   }
 
-  const startedAt = Date.now();
+  pendingActivation = true;
+  const activationGeneration = generation;
 
-  state = {
-    experimentId,
-    errorRate,
-    latencyMs,
-    startedAt,
-    expiresAt: startedAt + durationSeconds * 1000,
-  };
+  try {
+    // Esperar brevemente a que terminen llamadas que ya tenían permisos.
+    const deadline = performance.now() + 3000;
+    let release = reservePermits(resourceSlots);
 
-  expirationTimer = setTimeout(
-    () => resetFault("expired"),
-    durationSeconds * 1000
-  );
+    while (release === null && performance.now() < deadline) {
+      await delay(25);
 
-  expirationTimer.unref();
+      if (generation !== activationGeneration) {
+        res.status(409).json({ error: "Activación cancelada" });
+        return;
+      }
 
-  console.log(JSON.stringify({
-    event: "chaos.activated",
-    ...state,
-    target: `GET ${TARGET_PATH}`,
-    location: process.env.FAULT_LOCATION ?? "incoming",
-    timestamp: new Date().toISOString(),
-  }));
+      release = reservePermits(resourceSlots);
+    }
 
-  res.json(currentState());
+    if (release === null) {
+      res.status(409).json({
+        error: "No se pudieron reservar los permisos",
+        pool: poolState(),
+      });
+      return;
+    }
+
+    if (generation !== activationGeneration) {
+      release();
+      res.status(409).json({ error: "Activación cancelada" });
+      return;
+    }
+
+    releaseReservation = release;
+
+    const startedAt = Date.now();
+
+    state = {
+      experimentId,
+      errorRate,
+      latencyMs,
+      resourceSlots,
+      startedAt,
+      expiresAt: startedAt + durationSeconds * 1000,
+    };
+
+    expirationTimer = setTimeout(
+      () => resetFault("expired"),
+      durationSeconds * 1000
+    );
+
+    expirationTimer.unref();
+
+    console.log(JSON.stringify({
+      event: "chaos.activated",
+      ...currentState(),
+      timestamp: new Date().toISOString(),
+    }));
+
+    res.json(currentState());
+  } finally {
+    pendingActivation = false;
+  }
 });
 
 export async function faultMiddleware(
@@ -153,7 +212,6 @@ export async function faultMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  // La latencia saliente se aplica dentro del adaptador HTTP.
   if (process.env.FAULT_LOCATION === "outgoing") {
     next();
     return;
@@ -172,9 +230,7 @@ export async function faultMiddleware(
   }
 
   if (snapshot.latencyMs > 0) {
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, snapshot.latencyMs);
-    });
+    await delay(snapshot.latencyMs);
   }
 
   const active = currentState();
