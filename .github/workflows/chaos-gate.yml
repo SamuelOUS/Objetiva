@@ -207,3 +207,92 @@ jobs:
         run: |
           echo "The deployed canary passed the chaos quality gate." >> "$GITHUB_STEP_SUMMARY"
           echo "This stage only runs when chaos-gate succeeds." >> "$GITHUB_STEP_SUMMARY"
+  publish-dashboard:
+    name: Publish presentation dashboard
+    needs: chaos-gate
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare website
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          source = Path("reports/dashboard.html")
+          if not source.exists():
+              raise SystemExit("Falta reports/dashboard.html en el repositorio")
+
+          content = source.read_text(encoding="utf-8")
+          repo = os.environ["GITHUB_REPOSITORY"]
+          run_id = os.environ["GITHUB_RUN_ID"]
+
+          navigation = f"""
+          <section>
+            <h2>Demostración en vivo</h2>
+            <p>
+              <a target="_blank" rel="noopener"
+                 href="https://github.com/{repo}/actions/runs/{run_id}">
+                Abrir ejecución de GitHub Actions
+              </a>
+            </p>
+            <p>
+              <a target="_blank" rel="noopener"
+                 href="https://objetiva-canaryatsha256.onrender.com/demo/flujo">
+                Consultar flujo canary → stable
+              </a>
+            </p>
+            <p>
+              <a target="_blank" rel="noopener"
+                 href="https://dashboard.render.com/">
+                Abrir logs en Render
+              </a>
+            </p>
+            <p>
+              Para repetir la prueba, abre la ejecución y selecciona
+              Re-run all jobs. No ejecutes otro experimento simultáneamente.
+            </p>
+            <p>
+              Las gráficas siguientes son evidencia histórica.
+              Los resultados nuevos están en Summary y Artifacts.
+            </p>
+          </section>
+          """
+
+          content = content.replace(
+              "<main>",
+              "<main>" + navigation,
+              1,
+          )
+
+          output = Path("_site")
+          output.mkdir(exist_ok=True)
+          (output / "index.html").write_text(
+              content,
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
