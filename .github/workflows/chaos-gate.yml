@@ -61,6 +61,9 @@ jobs:
           mkdir -p .gate-run/evidence
           ln -s "$GITHUB_WORKSPACE/load" .gate-run/load
 
+      - name: Prepare deployed flow
+        run: python chaos/preflight.py
+
       - name: Validate experiment
         env:
           PYTHONPATH: ${{ github.workspace }}
