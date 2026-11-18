@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "title": "Indisponibilidad sintética de dependencia",
+  "description": "Con el perfil fijo de 5 solicitudes/s durante 360 segundos, al producir respuestas HTTP 503 sintéticas en el adaptador durante 120 segundos, la tasa de error funcional será <=1% en los 90 segundos centrales. Una respuesta válida puede usar cache de hasta cinco minutos y debe declararlo.",
+  "steady-state-hypothesis": {
+    "title": "Flujo saludable antes y tasa de error <=1% durante el fallo",
+    "probes": [
+      {
+        "type": "probe",
+        "name": "verify-availability",
+        "tolerance": true,
+        "provider": {
+          "type": "python",
+          "module": "chaos_runner",
+          "func": "availability_hypothesis",
+          "arguments": {
+            "max_error_rate": 0.01
+          }
+        }
+      }
+    ]
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "load-and-inject-503",
+      "provider": {
+        "type": "python",
+        "module": "chaos_runner",
+        "func": "run_fault",
+        "arguments": {
+          "latency_ms": 0,
+          "error_rate": 1,
+          "duration_seconds": 120,
+          "inject_after_seconds": 120
+        }
+      }
+    }
+  ],
+  "rollbacks": [
+    {
+      "type": "action",
+      "name": "revert-owned-fault",
+      "provider": {
+        "type": "python",
+        "module": "chaos_runner",
+        "func": "rollback"
+      }
+    }
+  ],
+  "scope": {
+    "blast_radius": "Adaptador saliente de GET /demo/flujo de una instancia canary. Respuestas sintéticas; stable permanece operativo.",
+    "duration_seconds": 120,
+    "abort_conditions": [
+      "k6 termina prematuramente",
+      "Administración o liveness inaccesibles",
+      "Experimento activo cambia o desaparece antes de tiempo",
+      "Activación tarda quince segundos o más"
+    ],
+    "automatic_reversion": "TTL, limpieza en finally y rollback de Chaos Toolkit"
+  },
+  "measurement": {
+    "metric": "functional_error_rate",
+    "threshold": 0.01,
+    "instrument": "k6 functional_errors en samples.jsonl",
+    "window_seconds": 90
+  },
+  "steady_state": {
+    "reference": "Las mediciones previas del flujo mostraron 0% de errores. El ejecutor conserva además el baseline de cada ronda.",
+    "functional_error_rate": 0
+  }
+}

@@ -110,17 +110,6 @@ faultAdminRouter.post("/admin/fault", (req, res) => {
     return;
   }
 
-  if (
-    process.env.FAULT_LOCATION === "outgoing" &&
-    errorRate > 0
-  ) {
-    res.status(400).json({
-      error:
-        "Esta versión del adaptador saliente solo implementa latencia. " +
-        "Usar errorRate=0.",
-    });
-    return;
-  }
 
   if (currentState().expiresAt > 0) {
     res.status(409).json({

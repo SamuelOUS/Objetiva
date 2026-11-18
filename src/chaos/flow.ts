@@ -92,7 +92,34 @@ flowRouter.get("/flujo", async (_req, res) => {
         await delay(fault.latencyMs, undefined, { signal });
       }
 
-      const response = await fetch(dependencyUrl, {
+      const activeFault = inject ? getFaultState() : null;
+
+      const simulateUnavailable =
+        activeFault !== null &&
+        activeFault.expiresAt > 0 &&
+        Math.random() < activeFault.errorRate;
+
+      if (simulateUnavailable) {
+        console.log(JSON.stringify({
+          event: "dependency.synthetic_response",
+          traceId,
+          experimentId: activeFault?.experimentId ?? "",
+          status: 503,
+          timestamp: new Date().toISOString(),
+        }));
+      }
+
+      const response = simulateUnavailable
+        ? new Response(
+            JSON.stringify({
+              error: "Indisponibilidad sintética de dependencia",
+            }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            }
+          )
+        : await fetch(dependencyUrl, {
         headers: {
           "x-trace-id": traceId,
         },

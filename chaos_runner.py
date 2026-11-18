@@ -143,10 +143,11 @@ def metrics(path, start, end):
     }
 
 
-def run_latency(
+def run_fault(
     latency_ms=1500,
     duration_seconds=120,
     inject_after_seconds=120,
+    error_rate=0,
 ):
     global RESULT, OWNED
     RESULT = {"status": "running"}
@@ -189,7 +190,10 @@ def run_latency(
     if not healthy():
         raise RuntimeError("El flujo no está saludable")
 
-    run_id = f"latency-{time.time_ns()}"
+    experiment_name = (
+        "dependency" if error_rate > 0 else "latency"
+    )
+    run_id = f"{experiment_name}-{time.time_ns()}"
     folder = root / "evidence" / run_id
     folder.mkdir(parents=True)
 
@@ -216,6 +220,7 @@ def run_latency(
             "not-recorded",
         ),
         "latency_ms": latency_ms,
+        "error_rate": error_rate,
         "duration_seconds": duration_seconds,
         "measurement_seconds": duration_seconds - 30,
     }
@@ -227,7 +232,11 @@ def run_latency(
 
     env = dict(
         os.environ,
-        EXPERIMENT="outgoing-latency",
+        EXPERIMENT=(
+            "dependency-unavailable"
+            if error_rate > 0
+            else "outgoing-latency"
+        ),
         ROUND=round_value,
         ENDPOINT=endpoint(),
     )
@@ -327,7 +336,7 @@ def run_latency(
                 "POST",
                 {
                     "experimentId": run_id,
-                    "errorRate": 0,
+                    "errorRate": error_rate,
                     "latencyMs": latency_ms,
                     "durationSeconds": duration_seconds,
                 },
@@ -340,6 +349,7 @@ def run_latency(
             if (
                 result.get("experimentId") != run_id
                 or result.get("latencyMs") != latency_ms
+                or result.get("errorRate") != error_rate
                 or result.get("expiresAt", 0)
                 - result.get("startedAt", 0)
                 != duration_seconds * 1000
@@ -497,3 +507,29 @@ def run_latency(
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait()
+
+def run_latency(
+    latency_ms=1500,
+    duration_seconds=120,
+    inject_after_seconds=120,
+):
+    return run_fault(
+        latency_ms=latency_ms,
+        duration_seconds=duration_seconds,
+        inject_after_seconds=inject_after_seconds,
+        error_rate=0,
+    )
+
+
+def availability_hypothesis(max_error_rate=0.01):
+    if RESULT is None:
+        return healthy()
+
+    if RESULT.get("status") != "complete":
+        return False
+
+    return bool(
+        RESULT["valid_load"]
+        and RESULT["recovered"]
+        and RESULT["injection"]["error_rate"] <= max_error_rate
+    )
